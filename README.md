@@ -11,6 +11,6 @@
 
 ---
 
-## 🌐 URL
-[👉 Muhammed Gasal](https://muhammedgasal.com)
-[👉 Click Here To Download](https://muhammedgasal.com)
+## 🌐 URLs
+- My Portfolio: [^_^ Muhammed Gasal Cheerangal](https://muhammedgasal.com)
+- Get APK File: [^_~ Not Build EAS Yet!!](https://muhammedgasal.com)
