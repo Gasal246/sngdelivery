@@ -7,11 +7,14 @@ import axios from "axios";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { baseUrl } from '../../constants/endpoints';
+import { useDispatch } from 'react-redux';
+import { loadUserData, loadUserToken } from '../../store/slices/appslice';
 
 const height = Dimensions.get('window').height;
 
 const CheckNumberPage = () => {
     const navigation = useNavigation();
+    const dispatch = useDispatch();
     const [loading, setLoading] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState('');
 
@@ -41,7 +44,10 @@ const CheckNumberPage = () => {
 
     const handleCheckAuth = async () => {
         const token = await AsyncStorage.getItem("token");
-        if (token) {
+        const userData = await AsyncStorage.getItem("user_data");
+        if (token && userData) {
+            dispatch(loadUserToken(token));
+            dispatch(loadUserData(await JSON.parse(userData)));
             navigation.navigate("Home");
         }
     }

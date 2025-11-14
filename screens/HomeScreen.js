@@ -118,13 +118,15 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        paddingTop: 15
     },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
         padding: 15,
-        paddingHorizontal: 21
+        paddingHorizontal: 21,
+        marginBottom: 20
     },
     headerText: {
         fontSize: 20,
@@ -143,17 +145,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     boxItem: {
-        padding: 4,
+        padding: 5,
         width: "50%",
         borderRadius: 15,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 3.84,
-        elevation: 5,
     },
     box: {
         borderWidth: 1,
@@ -164,6 +158,7 @@ const styles = StyleSheet.create({
         height: 130,
         padding: 10,
         paddingTop: 20,
+        boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.25)",
     },
     boxTitle: {
         fontSize: 16,

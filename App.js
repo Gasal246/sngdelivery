@@ -8,12 +8,16 @@ import { StatusBar } from 'react-native';
 import StaffCamps from './components/screens/StaffCamps';
 import CheckNumberPage from './screens/auth/CheckNumberPage';
 import LoginPage from './screens/auth/LoginPage';
+import NotificationScreen from './screens/NotificationScreen';
+import { Provider } from 'react-redux';
+import { store } from './store/store';
 const Stack = createStackNavigator();
 
 export default function App() {
   return (
+    <Provider store={store}>
       <NavigationContainer>
-      <StatusBar style="light" />
+        <StatusBar style="light" />
         <Stack.Navigator initialRouteName='CheckNumber'>
           <Stack.Screen name="CheckNumber" component={CheckNumberPage} options={{ headerShown: false }} />
           <Stack.Screen name="LoginPage" component={LoginPage} options={{ headerShown: false }} />
@@ -21,7 +25,9 @@ export default function App() {
           <Stack.Screen name="Orders" component={OrdersScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
           <Stack.Screen name="StaffCamps" component={StaffCamps} options={{ headerShown: false }} />
+          <Stack.Screen name="Notification" component={NotificationScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
+    </Provider>
   );
 }

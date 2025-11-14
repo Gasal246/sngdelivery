@@ -1,7 +1,7 @@
 // /components/RootBottomBar.js
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native'
 import React from 'react'
-import { Home, Package, User } from 'lucide-react-native'
+import { Bell, Home, Package, User } from 'lucide-react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { BlurView } from 'expo-blur'
 
@@ -20,6 +20,11 @@ const RootBottomBarList = [
     name: "Profile",
     icon: (active) => <User size={26} strokeWidth={active ? 3 : 2} color={active ? "#5AE7A6" : "#D1D5DB"} />,
     screen: "Profile",
+  },
+  {
+    name: "Notification",
+    icon: (active) => <Bell size={26} strokeWidth={active ? 3 : 2} color={active ? "#5AE7A6" : "#D1D5DB"} />,
+    screen: "Notification",
   },
 ]
 
