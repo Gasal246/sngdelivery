@@ -25,7 +25,7 @@ const HomeScreen = () => {
         day: "2-digit",
         month: "short",
         year: "numeric",
-    }); // → “07 Nov 2025”
+    }).replaceAll(' ', ' | '); // → “07 | Nov | 2025”
 
     const timeStr = now
         .toLocaleTimeString("en-US", {
@@ -34,7 +34,7 @@ const HomeScreen = () => {
             second: "2-digit",
             hour12: true,
         })
-        .replace(" ", "")
+        .replaceAll(" ", "")
         .toLowerCase();
 
     return (

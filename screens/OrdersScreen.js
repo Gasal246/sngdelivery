@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { StyleSheet, Image, View, TouchableOpacity, Text, FlatList } from 'react-native'
 import RootLayout from './layouts/RootLayout'
 import { ChevronLeftIcon, ChevronRight, Filter } from 'lucide-react-native'
 import { useNavigation } from '@react-navigation/native'
 import OrderCard from '../components/ui/OrderCard'
 import OrderModal from '../components/ui/OrderModal'
+import { useSelector } from 'react-redux'
 
 const today = new Date();
 const yesterday = new Date(today);
@@ -130,6 +131,8 @@ const OrdersScreen = () => {
   const [dateFilter, setDateFilter] = React.useState('today');
   const [statusFilter, setStatusFilter] = React.useState('pending');
   const [selectedOrder, setSelectedOrder] = React.useState(null);
+
+  const { userToken } = useSelector((state) => state.application);
 
   const renderFilters = () => (
     <View style={styles.filtersContainer}>
