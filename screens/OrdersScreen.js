@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { StyleSheet, Image, View, TouchableOpacity, Text, FlatList } from 'react-native'
 import RootLayout from './layouts/RootLayout'
 import { ChevronLeftIcon, ChevronRight, Filter } from 'lucide-react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import OrderCard from '../components/ui/OrderCard'
 import OrderModal from '../components/ui/OrderModal'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
+import { fetchDeliveryOrders } from '../store/slices/appslice'
 
 const today = new Date();
 const yesterday = new Date(today);
@@ -13,7 +14,7 @@ yesterday.setDate(yesterday.getDate() - 1);
 const lastWeek = new Date(today);
 lastWeek.setDate(lastWeek.getDate() - 7);
 
-const orders = [
+const mockOrders = [
   {
     id: '1',
     customerName: 'Ahmad Al-Farsi',
@@ -127,12 +128,84 @@ const orders = [
 
 const OrdersScreen = () => {
   const navigation = useNavigation();
-  const [showFilters, setShowFilters] = React.useState(false);
-  const [dateFilter, setDateFilter] = React.useState('today');
-  const [statusFilter, setStatusFilter] = React.useState('pending');
-  const [selectedOrder, setSelectedOrder] = React.useState(null);
+  const route = useRoute();
+  const dispatch = useDispatch();
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFilter, setDateFilter] = useState('today');
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const { userToken } = useSelector((state) => state.application);
+  const { storeId, campId, storeName, campName } = route.params || {};
+
+  const { userToken, orders } = useSelector((state) => state.application);
+
+  useEffect(() => {
+    if (!orders && userToken) {
+      dispatch(fetchDeliveryOrders({ period: "day", token: userToken }));
+    }
+  }, [orders, userToken, dispatch]);
+
+  const normalizeStatus = (status) => {
+    if (status === 0 || status === "0") return "pending";
+    if (status === 1 || status === "1") return "completed";
+    if (status === 2 || status === "2") return "cancelled";
+    return status || "pending";
+  };
+
+  const parseDate = (dateVal) => {
+    const date = dateVal ? new Date(dateVal) : new Date();
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
+
+  const sourceOrders = Array.isArray(orders) && orders.length ? orders : mockOrders;
+
+  const filteredOrders = useMemo(() => {
+    const hasStoreKey = sourceOrders.some(order => order?.store_id || order?.storeId);
+    return sourceOrders.filter((order) => {
+      const matchesStore = !storeId || `${order?.store_id ?? order?.storeId}` === `${storeId}`;
+      const matchesCamp = !campId || `${order?.camp_id ?? order?.campId}` === `${campId}`;
+      if ((storeId || campId) && !hasStoreKey) return true; // allow mock data to show when no ids present
+      return matchesStore && matchesCamp;
+    });
+  }, [sourceOrders, storeId, campId]);
+
+  const displayOrders = filteredOrders.map((order, index) => {
+    const orderId = order?._id || order?.order_id || order?.id || `order-${index}`;
+    const customerName = order?.customer_name || order?.customerName || order?.user_name || "Customer";
+    const building = order?.building || order?.address || order?.block || "Building";
+    const floor = order?.floor || order?.level || "0";
+    const room = order?.room || order?.unit || order?.apartment || "0";
+    const bottleCount = order?.bottle_count ?? order?.bottles ?? 0;
+    const packageName = order?.package_name || order?.packageName || "Package";
+    const orderDate = parseDate(order?.orderDate || order?.createdAt || order?.created_at);
+    const deliveryTime = order?.deliveryTime ? parseDate(order.deliveryTime) : order?.deliveredAt ? parseDate(order.deliveredAt) : undefined;
+
+    return {
+      id: `${orderId}`,
+      customerName,
+      building,
+      floor: `${floor}`,
+      room: `${room}`,
+      bottles: bottleCount,
+      packageName,
+      zone: order?.zone || campName || storeName || "Zone",
+      status: normalizeStatus(order?.status),
+      orderDate,
+      deliveryTime,
+      phoneNumber: order?.phone || order?.phoneNumber || order?.customer_phone || "",
+      notes: order?.notes,
+      store_id: order?.store_id ?? order?.storeId,
+      camp_id: order?.camp_id ?? order?.campId,
+      raw: order,
+    };
+  });
+
+  const selectedLabel = useMemo(() => {
+    if (storeName || campName) {
+      return `${storeName ?? 'Store'}${campName ? ` / ${campName}` : ''}`;
+    }
+    return 'All Orders';
+  }, [storeName, campName]);
 
   const renderFilters = () => (
     <View style={styles.filtersContainer}>
@@ -186,7 +259,9 @@ const OrdersScreen = () => {
           <Image source={require("../assets/png/sngcolor.png")} style={{ width: 53, aspectRatio: 1 / 1, resizeMode: "contain", opacity: 0.9 }} />
         </View>
         <TouchableOpacity style={styles.header2} onPress={() => navigation.navigate("StaffCamps")}>
-          <Text style={{ fontFamily: "Orbitron", fontSize: 17, textAlign: "left", fontWeight: "bold", opacity: 0.9 }}> ( 3 ) All Orders</Text>
+          <Text style={{ fontFamily: "Orbitron", fontSize: 17, textAlign: "left", fontWeight: "bold", opacity: 0.9 }}>
+            ({displayOrders.length}) {selectedLabel}
+          </Text>
           <ChevronRight size={24} strokeWidth={3} color="#000" />
         </TouchableOpacity>
 
@@ -200,7 +275,7 @@ const OrdersScreen = () => {
         {showFilters && renderFilters()}
 
         <FlatList
-          data={orders}
+          data={displayOrders}
           style={{ height: "78%", borderRadius: 10, overflow: 'hidden' }}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -310,5 +385,22 @@ const styles = StyleSheet.create({
   },
   activeFilterButtonText: {
     color: 'white',
+  },
+  ordersList: {
+    paddingBottom: 80,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  emptySubtext: {
+    color: "#e0e0e0",
+    marginTop: 6,
+    fontSize: 12,
   },
 });

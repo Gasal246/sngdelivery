@@ -12,9 +12,9 @@ const RootBottomBarList = [
     screen: "Home",
   },
   {
-    name: "Orders",
+    name: "StaffCamps",
     icon: (active) => <Package size={26} strokeWidth={active ? 3 : 2} color={active ? "#5AE7A6" : "#D1D5DB"} />,
-    screen: "Orders",
+    screen: "StaffCamps",
   },
   {
     name: "Profile",

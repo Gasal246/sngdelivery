@@ -1,14 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RootLayout from './layouts/RootLayout';
 import * as Font from "expo-font";
 import { BlurView } from 'expo-blur'
 import { Milk, Package, PackageOpen } from 'lucide-react-native';
 import RootBottomBar from '../components/shared/RootBottomBar';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchDeliveryOrders } from '../store/slices/appslice';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
+    const dispatch = useDispatch();
+    const navigation = useNavigation();
     const [loaded, setLoaded] = useState(false);
     const [now, setNow] = useState(new Date());
+    const { orders, userToken } = useSelector((state) => state.application);
+
+    const [pendingOrders, setPendingOrders] = useState(0);
+    const [deliveredOrders, setDeliveredOrders] = useState(0);
+    const [deliveredBottles, setDeliveredBottles] = useState(0);
+    const [collectedBottles, setCollectedBottles] = useState(0);
 
     useEffect(() => {
         Font.loadAsync({
@@ -19,23 +30,38 @@ const HomeScreen = () => {
         return () => clearInterval(interval);
     }, []);
 
+    useEffect(() => {
+        if (userToken) setupInsights();
+    }, [userToken]);
+
+    const setupInsights = async () => {
+        if (!userToken) {
+            console.log("Not Authorized!!");
+            return;
+        }
+        try {
+            const data = await dispatch(fetchDeliveryOrders({ period: "day", token: userToken })).unwrap();
+            if (data && data?.length > 0) {
+                console.log("Fetched Orders: ", data?.length);
+                const pending = data.filter(order => order.status === 0);
+                const delivered = data.filter(order => order.status === 1);
+                const collected_bottles = delivered.reduce((acc, order) => acc + order.empty_bottles_collected, 0);
+                const delivered_bottles = delivered.reduce((acc, order) => acc + order.bottle_count, 0);
+                setPendingOrders(pending.length);
+                setDeliveredOrders(delivered.length);
+                setDeliveredBottles(delivered_bottles);
+                setCollectedBottles(collected_bottles);
+            }
+        } catch (err) {
+            console.log("Failed to fetch orders", err?.response ?? err);
+        }
+    };
+
     if (!loaded) return null;
 
-    const dateStr = now.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).replaceAll(' ', ' | '); // → “07 | Nov | 2025”
+    const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", }).replaceAll(' ', ' | '); // → “07 | Nov | 2025”
 
-    const timeStr = now
-        .toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-        })
-        .replaceAll(" ", "")
-        .toLowerCase();
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, }).replaceAll(" ", "").toLowerCase(); // → “07:15:30 am”
 
     return (
         <RootLayout layoutViewStyle={{ padding: 0 }}>
@@ -49,23 +75,23 @@ const HomeScreen = () => {
                 </View>
 
                 <View style={styles.boxContainer}>
-                    <View style={styles.boxItem}>
+                    <TouchableOpacity style={styles.boxItem} onPress={() => navigation.navigate("StaffCamps")}>
                         <BlurView intensity={45} tint="light" style={styles.box}>
                             <View style={{ flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center", marginBottom: 10 }}>
                                 <Package size={18} color="yellow" />
                                 <Text style={styles.boxTitle}>Pending </Text>
                             </View>
-                            <Text style={styles.boxSubTitle}>0</Text>
+                            <Text style={styles.boxSubTitle}>{pendingOrders}</Text>
                             <Text style={styles.boxSubTitle2}>Today</Text>
                         </BlurView>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.boxItem}>
                         <BlurView intensity={45} tint="light" style={styles.box}>
                             <View style={{ flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center", marginBottom: 10 }}>
                                 <PackageOpen size={18} color="#5AE7A6" />
                                 <Text style={styles.boxTitle}>Completed</Text>
                             </View>
-                            <Text style={styles.boxSubTitle}>0</Text>
+                            <Text style={styles.boxSubTitle}>{deliveredOrders}</Text>
                             <Text style={styles.boxSubTitle2}>Today</Text>
                         </BlurView>
                     </View>
@@ -74,14 +100,14 @@ const HomeScreen = () => {
                     <View style={styles.boxItem}>
                         <BlurView intensity={45} tint="light" style={styles.box}>
                             <Text style={styles.boxTitle}>Delivered</Text>
-                            <Text style={styles.boxSubTitle}>0</Text>
+                            <Text style={styles.boxSubTitle}>{deliveredBottles}</Text>
                             <Text style={styles.boxSubTitle2}>Bottles Today</Text>
                         </BlurView>
                     </View>
                     <View style={styles.boxItem}>
                         <BlurView intensity={45} tint="light" style={styles.box}>
                             <Text style={styles.boxTitle}>Collected</Text>
-                            <Text style={styles.boxSubTitle}>0</Text>
+                            <Text style={styles.boxSubTitle}>{collectedBottles}</Text>
                             <Text style={styles.boxSubTitle2}>Bottles Today</Text>
                         </BlurView>
                     </View>
