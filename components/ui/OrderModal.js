@@ -2,19 +2,13 @@ import React, { useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Linking, } from 'react-native';
 import { X, Phone, MapPin, Droplets, Clock, CheckCircle, XCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function OrderModal({ order, visible, onClose }) {
     const [isUpdating, setIsUpdating] = useState(false);
-    const [emptyBottleCount, setEmptyBottleCount] = useState(order?.order?.empty_bottles_recieved?.toString() || '0');
-    const [notes, setNotes] = useState(order?.order?.package_desc || order?.notes || "");
+    const [emptyBottleCount, setEmptyBottleCount] = useState(0);
+    const [notes, setNotes] = useState("");
     const [inputHeight, setInputHeight] = useState(80);
-
-    React.useEffect(() => {
-        if (order) {
-            setEmptyBottleCount(order?.order?.empty_bottles_recieved?.toString() || '0');
-            setNotes(order?.order?.package_desc || order?.notes || "");
-        }
-    }, [order]);
 
     if (!order) return null;
 
@@ -55,7 +49,6 @@ export default function OrderModal({ order, visible, onClose }) {
     const user = nestedOrder?.user ?? {};
     const packageName = nestedOrder?.package_name || nestedOrder?.packge_name || 'Package';
     const bottleCount = nestedOrder?.bottle_count ?? 0;
-    const emptyBottlesReceived = nestedOrder?.empty_bottles_recieved ?? 0;
     const leftCount = nestedOrder?.left_count ?? bottleCount;
     const initialCount = nestedOrder?.initial_count ?? bottleCount;
     const phoneNumber = user?.phone ? `+${user?.country_code ?? ''}${user.phone}` : '';
@@ -76,7 +69,7 @@ export default function OrderModal({ order, visible, onClose }) {
     const deliveredDate = statusLabel === 'completed'
         ? ensureDate(order?.updatedAt || nestedOrder?.updatedAt)
         : null;
-    const bottleInHand = user?.bottle_in_hand ?? 0;
+    const bottleInHand = nestedOrder?.bottle_in_hand ?? 0;
 
     return (
         <Modal
@@ -86,148 +79,146 @@ export default function OrderModal({ order, visible, onClose }) {
             onRequestClose={onClose}
         >
             <LinearGradient style={styles.container} colors={["white", "#dbefefff"]}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Order Details</Text>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <X size={24} color="#6B7280" />
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    <View style={styles.statusContainer}>
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(statusLabel) }]}>
-                            <Text style={styles.statusText}>{statusLabel.toUpperCase()}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Customer Information</Text>
-                        <Text style={styles.customerName}>{user?.name || 'Customer'}</Text>
-                        <TouchableOpacity style={styles.phoneContainer} onPress={() => phoneNumber && Linking.openURL(`tel:${phoneNumber}`)}>
-                            <Phone size={16} color="#2D7A7A" />
-                            <Text style={styles.phoneText}>{phoneNumber || "Not provided"}</Text>
+                <SafeAreaView style={styles.container} edges={["top"]}>
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Order Details</Text>
+                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                            <X size={24} color="#6B7280" />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.section, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-                        <Text style={styles.sectionTitle}>Bottle In Hand</Text>
-                        <View style={[styles.bottlesContainer, { backgroundColor: '#fff3a8ff' }]}>
-                            <Droplets size={16} color="#2D7A7A" />
-                            <Text style={styles.bottlesText}>{bottleInHand} Bottle{bottleInHand === 1 ? '' : 's'}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Delivery Address</Text>
-                        <View style={styles.addressContainer}>
-                            <MapPin size={16} color="#6B7280" />
-                            <View style={styles.addressDetails}>
-                                <Text style={styles.building}>{building}</Text>
-                                <Text style={styles.addressText}>Block: {block}</Text>
-                                <Text style={styles.addressText}>Floor: {floor}</Text>
-                                <Text style={styles.addressText}>Room: {room}</Text>
-                                <Text style={styles.zoneText}>Camp: {campLabel}</Text>
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                        <View style={styles.statusContainer}>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(statusLabel) }]}>
+                                <Text style={styles.statusText}>{statusLabel.toUpperCase()}</Text>
                             </View>
                         </View>
-                    </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Order Details</Text>
-                        <View style={styles.orderInfo}>
-                            <View style={styles.packageContainer}>
-                                <Text style={styles.packageName}>{packageName}</Text>
-                                <View style={styles.bottlesContainer}>
-                                    <Droplets size={16} color="#2D7A7A" />
-                                    <Text style={styles.bottlesText}>{bottleCount} Bottle{bottleCount === 1 ? '' : 's'}</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Customer Information</Text>
+                            <Text style={styles.customerName}>{user?.name || 'Customer'}</Text>
+                            <TouchableOpacity style={styles.phoneContainer} onPress={() => phoneNumber && Linking.openURL(`tel:${phoneNumber}`)}>
+                                <Phone size={16} color="#2D7A7A" />
+                                <Text style={styles.phoneText}>{phoneNumber || "Not provided"}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.section, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+                            <Text style={styles.sectionTitle}>Bottle In Hand</Text>
+                            <View style={[styles.bottlesContainer, { backgroundColor: '#fff3a8ff' }]}>
+                                <Droplets size={16} color="#2D7A7A" />
+                                <Text style={styles.bottlesText}>{bottleInHand} Bottle{bottleInHand === 1 ? '' : 's'}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Delivery Address</Text>
+                            <View style={styles.addressContainer}>
+                                <MapPin size={16} color="#6B7280" />
+                                <View style={styles.addressDetails}>
+                                    <Text style={styles.building}>{building}</Text>
+                                    <Text style={styles.addressText}>Block: {block}</Text>
+                                    <Text style={styles.addressText}>Floor: {floor}</Text>
+                                    <Text style={styles.addressText}>Room: {room}</Text>
+                                    <Text style={styles.zoneText}>Camp: {campLabel}</Text>
                                 </View>
                             </View>
-                            {order?.isConsumption && (
-                                <Text style={styles.consumptionMeta}>
-                                    Initial: {initialCount} | Left: {leftCount}
-                                </Text>
-                            )}
                         </View>
-                    </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Timeline</Text>
-                        <View style={styles.timelineContainer}>
-                            <Clock size={16} color="#6B7280" />
-                            <View style={styles.timelineDetails}>
-                                <Text style={styles.timelineText}>
-                                    Ordered: {formatDate(orderedDate)} at {formatTime(orderedDate)}
-                                </Text>
-                                <Text style={styles.timelineText}>
-                                    Assigned: {formatDate(assignedDate)} at {formatTime(assignedDate)}
-                                </Text>
-                                {deliveredDate && (
-                                    <Text style={styles.timelineText}>
-                                        Delivered: {formatDate(deliveredDate)} at {formatTime(deliveredDate)}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Order Details</Text>
+                            <View style={styles.orderInfo}>
+                                <View style={styles.packageContainer}>
+                                    <Text style={styles.packageName}>{packageName}</Text>
+                                    <View style={styles.bottlesContainer}>
+                                        <Droplets size={16} color="#2D7A7A" />
+                                        <Text style={styles.bottlesText}>{bottleCount} Bottle{bottleCount === 1 ? '' : 's'}</Text>
+                                    </View>
+                                </View>
+                                {order?.isConsumption && (
+                                    <Text style={styles.consumptionMeta}>
+                                        Initial: {initialCount} | Left: {leftCount}
                                     </Text>
                                 )}
                             </View>
                         </View>
-                    </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Empty Bottles to Return</Text>
-                        <Text style={styles.sectionSubtitle}>Enter the number of empty bottles to collect</Text>
-                        <View style={styles.emptyBottlesInputContainer}>
-                            <TextInput
-                                style={styles.emptyBottlesInput}
-                                value={emptyBottleCount}
-                                onChangeText={(value) => setEmptyBottleCount(value)}
-                                keyboardType="numeric"
-                                placeholder="0"
-                                placeholderTextColor="#9CA3AF"
-                            />
-                            <Text style={styles.emptyBottlesLabel}>bottles</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Timeline</Text>
+                            <View style={styles.timelineContainer}>
+                                <Clock size={16} color="#6B7280" />
+                                <View style={styles.timelineDetails}>
+                                    <Text style={styles.timelineText}>
+                                        Ordered: {formatDate(orderedDate)} at {formatTime(orderedDate)}
+                                    </Text>
+                                    <Text style={styles.timelineText}>
+                                        Assigned: {formatDate(assignedDate)} at {formatTime(assignedDate)}
+                                    </Text>
+                                    {deliveredDate && (
+                                        <Text style={styles.timelineText}>
+                                            Delivered: {formatDate(deliveredDate)} at {formatTime(deliveredDate)}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
                         </View>
-                        <Text style={styles.captionText}>Collected so far: {emptyBottlesReceived}</Text>
-                    </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Notes</Text>
-                        <TextInput
-                            style={[styles.notesInput, { height: Math.max(80, inputHeight) }]} // auto height
-                            value={notes}
-                            onChangeText={(value) => {
-                                if (value.length <= 300) setNotes(value); // restrict length
-                            }}
-                            multiline
-                            onContentSizeChange={(e) =>
-                                setInputHeight(e.nativeEvent.contentSize.height)
-                            }
-                            placeholder="Type your notes here..."
-                        />
-                        <Text style={styles.charCount}>{notes.length}/300</Text>
-                    </View>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Empty Bottles to Return</Text>
+                            <Text style={styles.sectionSubtitle}>Enter the number of empty bottles to collect</Text>
+                            <View style={styles.emptyBottlesInputContainer}>
+                                <TextInput
+                                    style={styles.emptyBottlesInput}
+                                    value={emptyBottleCount}
+                                    onChangeText={(value) => setEmptyBottleCount(value)}
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    placeholderTextColor="#9CA3AF"
+                                />
+                                <Text style={styles.emptyBottlesLabel}>bottles</Text>
+                            </View>
+                        </View>
 
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Notes</Text>
+                            <TextInput
+                                style={[styles.notesInput, { height: Math.max(80, inputHeight) }]} // auto height
+                                value={notes}
+                                onChangeText={(value) => {
+                                    if (value.length <= 300) setNotes(value); // restrict length
+                                }}
+                                multiline
+                                onContentSizeChange={(e) =>
+                                    setInputHeight(e.nativeEvent.contentSize.height)
+                                }
+                                placeholder="Type your notes here..."
+                            />
+                            <Text style={styles.charCount}>{notes.length}/300</Text>
+                        </View>
+                    </ScrollView>
 
+                    {statusLabel === 'pending' && (
+                        <View style={styles.actionButtons}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.completeButton]}
+                                onPress={() => { }}
+                                disabled={isUpdating}
+                            >
+                                <CheckCircle size={20} color="white" />
+                                <Text style={styles.actionButtonText}>Mark as Completed</Text>
+                            </TouchableOpacity>
 
-                </ScrollView>
-
-                {statusLabel === 'pending' && (
-                    <View style={styles.actionButtons}>
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.completeButton]}
-                            onPress={() => { }}
-                            disabled={isUpdating}
-                        >
-                            <CheckCircle size={20} color="white" />
-                            <Text style={styles.actionButtonText}>Mark as Completed</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.cancelButton]}
-                            onPress={() => { }}
-                            disabled={isUpdating}
-                        >
-                            <XCircle size={20} color="white" />
-                            <Text style={styles.actionButtonText}>Cancel Order</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.cancelButton]}
+                                onPress={() => { }}
+                                disabled={isUpdating}
+                            >
+                                <XCircle size={20} color="white" />
+                                <Text style={styles.actionButtonText}>Cancel Order</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </SafeAreaView>
             </LinearGradient>
         </Modal>
     );

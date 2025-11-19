@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Image, View, TouchableOpacity, Text, FlatList } from 'react-native'
+import { StyleSheet, Image, View, TouchableOpacity, Text, FlatList, ActivityIndicator } from 'react-native'
 import RootLayout from './layouts/RootLayout'
 import { ChevronLeftIcon, ChevronRight, Filter } from 'lucide-react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
@@ -7,12 +7,8 @@ import OrderCard from '../components/ui/OrderCard'
 import OrderModal from '../components/ui/OrderModal'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchDeliveryOrders } from '../store/slices/appslice'
-
-const today = new Date();
-const yesterday = new Date(today);
-yesterday.setDate(yesterday.getDate() - 1);
-const lastWeek = new Date(today);
-lastWeek.setDate(lastWeek.getDate() - 7);
+import axios from 'axios'
+import { baseUrl } from '../constants/endpoints'
 
 const OrdersScreen = () => {
   const navigation = useNavigation();
@@ -22,6 +18,8 @@ const OrdersScreen = () => {
   const [dateFilter, setDateFilter] = useState('today');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [periodOrders, setPeriodOrders] = useState(null);
+  const [isPeriodLoading, setIsPeriodLoading] = useState(false);
 
   const { storeId, campId, storeName, campName } = route.params || {};
 
@@ -41,22 +39,68 @@ const OrdersScreen = () => {
     return status || "pending";
   };
 
-  const parseDate = (dateVal) => {
-    const date = dateVal ? new Date(dateVal) : new Date();
-    return isNaN(date.getTime()) ? new Date() : date;
-  };
-
-  const sourceOrders = Array.isArray(orders) && orders.length ? orders : mockOrders;
+  const baseOrders = Array.isArray(periodOrders)
+    ? periodOrders
+    : (Array.isArray(orders) ? orders : []);
 
   const filteredOrders = useMemo(() => {
-    const hasStoreKey = sourceOrders.some(order => order?.store_id || order?.storeId);
-    return sourceOrders.filter((order) => {
+    const hasStoreKey = baseOrders.some(order => order?.store_id || order?.storeId);
+    return baseOrders.filter((order) => {
       const matchesStore = !storeId || `${order?.store_id ?? order?.storeId}` === `${storeId}`;
       const matchesCamp = !campId || `${order?.camp_id ?? order?.campId}` === `${campId}`;
       if ((storeId || campId) && !hasStoreKey) return true; // allow mock data to show when no ids present
       return matchesStore && matchesCamp;
     });
-  }, [sourceOrders, storeId, campId]);
+  }, [baseOrders, storeId, campId]);
+
+  const statusFilteredOrders = useMemo(() => {
+    if (statusFilter === 'all') return filteredOrders;
+    return filteredOrders.filter((order) => normalizeStatus(order?.status, order?.isCancelled) === statusFilter);
+  }, [filteredOrders, statusFilter]);
+
+  useEffect(() => {
+    if (!userToken) return;
+    if (dateFilter === 'today') {
+      setPeriodOrders(null);
+      setIsPeriodLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadPeriodOrders = async () => {
+      try {
+        setIsPeriodLoading(true);
+        const periodMap = { today: 'day', week: 'week', month: 'month' };
+        const periodParam = periodMap[dateFilter] || dateFilter;
+        const queryParts = [`period=${encodeURIComponent(periodParam)}`];
+        if (storeId) queryParts.push(`storeId=${encodeURIComponent(storeId)}`);
+        if (campId) queryParts.push(`campId=${encodeURIComponent(campId)}`);
+        const queryString = queryParts.join('&');
+
+        const { data } = await axios.get(`${baseUrl}/delivery-staff/orders?${queryString}`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+
+        if (!cancelled) {
+          setPeriodOrders(Array.isArray(data?.data) ? data.data : []);
+          setStatusFilter('all');
+        }
+      } catch (error) {
+        console.log("Failed to fetch period orders", error?.response ?? error);
+        if (!cancelled) {
+          setPeriodOrders([]);
+          setStatusFilter('all');
+        }
+      } finally {
+        if (!cancelled) setIsPeriodLoading(false);
+      }
+    };
+
+    loadPeriodOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFilter, userToken, storeId, campId]);
 
   const selectedLabel = useMemo(() => {
     if (storeName || campName) {
@@ -118,7 +162,7 @@ const OrdersScreen = () => {
         </View>
         <TouchableOpacity style={styles.header2} onPress={() => navigation.navigate("StaffCamps")}>
           <Text style={{ fontFamily: "Orbitron", fontSize: 17, textAlign: "left", fontWeight: "bold", opacity: 0.9 }}>
-            ({filteredOrders.length}) {selectedLabel}
+            ({statusFilteredOrders.length}) {selectedLabel}
           </Text>
           <ChevronRight size={24} strokeWidth={3} color="#000" />
         </TouchableOpacity>
@@ -133,9 +177,9 @@ const OrdersScreen = () => {
         {showFilters && renderFilters()}
 
         <FlatList
-          data={filteredOrders}
+          data={statusFilteredOrders}
           style={{ height: "78%", borderRadius: 10, overflow: 'hidden' }}
-          keyExtractor={(item) => item?._id}
+          keyExtractor={(item, index) => `${item?._id ?? item?.order_id ?? index}`}
           renderItem={({ item }) => (
             <OrderCard
               order={item}
@@ -146,8 +190,17 @@ const OrdersScreen = () => {
           contentContainerStyle={styles.ordersList}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No orders found</Text>
-              <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
+              {isPeriodLoading ? (
+                <>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={[styles.emptyText, { marginTop: 12 }]}>Fetching orders...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emptyText}>No orders found</Text>
+                  <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
+                </>
+              )}
             </View>
           }
         />
