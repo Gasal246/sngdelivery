@@ -5,20 +5,28 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OrderModal({ order, visible, onClose }) {
     const [isUpdating, setIsUpdating] = useState(false);
-    const [emptyBottleCount, setEmptyBottleCount] = useState(order?.emptyBottles?.toString() || '0');
-    const [notes, setNotes] = useState("");
+    const [emptyBottleCount, setEmptyBottleCount] = useState(order?.order?.empty_bottles_recieved?.toString() || '0');
+    const [notes, setNotes] = useState(order?.order?.package_desc || order?.notes || "");
     const [inputHeight, setInputHeight] = useState(80);
 
     React.useEffect(() => {
         if (order) {
-            setEmptyBottleCount(order.emptyBottles?.toString() || '0');
+            setEmptyBottleCount(order?.order?.empty_bottles_recieved?.toString() || '0');
+            setNotes(order?.order?.package_desc || order?.notes || "");
         }
     }, [order]);
 
     if (!order) return null;
 
+    const ensureDate = (value) => {
+        if (value instanceof Date) return value;
+        const parsed = value ? new Date(value) : new Date();
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
+    };
+
     const formatTime = (date) => {
-        return date.toLocaleTimeString('en-US', {
+        const safeDate = ensureDate(date);
+        return safeDate.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true
@@ -26,7 +34,8 @@ export default function OrderModal({ order, visible, onClose }) {
     };
 
     const formatDate = (date) => {
-        return date.toLocaleDateString('en-US', {
+        const safeDate = ensureDate(date);
+        return safeDate.toLocaleDateString('en-US', {
             day: '2-digit',
             month: 'short',
             year: 'numeric'
@@ -41,6 +50,33 @@ export default function OrderModal({ order, visible, onClose }) {
             default: return '#6B7280';
         }
     };
+
+    const nestedOrder = order?.order ?? {};
+    const user = nestedOrder?.user ?? {};
+    const packageName = nestedOrder?.package_name || nestedOrder?.packge_name || 'Package';
+    const bottleCount = nestedOrder?.bottle_count ?? 0;
+    const emptyBottlesReceived = nestedOrder?.empty_bottles_recieved ?? 0;
+    const leftCount = nestedOrder?.left_count ?? bottleCount;
+    const initialCount = nestedOrder?.initial_count ?? bottleCount;
+    const phoneNumber = user?.phone ? `+${user?.country_code ?? ''}${user.phone}` : '';
+    const building = user?.building_no || user?.block_building || 'N/A';
+    const block = user?.block || user?.block_building || 'N/A';
+    const floor = user?.floor_no || 'N/A';
+    const room = user?.room_no || 'N/A';
+    const campLabel = order?.camp?.camp_name || order?.camp_name || order?.camp_id || 'N/A';
+    const statusLabel = order?.isCancelled
+        ? 'cancelled'
+        : (order?.status === 1 || order?.status === '1')
+            ? 'completed'
+            : (order?.status === 2 || order?.status === '2')
+                ? 'cancelled'
+                : 'pending';
+    const assignedDate = ensureDate(order?.createdAt);
+    const orderedDate = nestedOrder?.createdAt ? ensureDate(nestedOrder.createdAt) : assignedDate;
+    const deliveredDate = statusLabel === 'completed'
+        ? ensureDate(order?.updatedAt || nestedOrder?.updatedAt)
+        : null;
+    const bottleInHand = user?.bottle_in_hand ?? 0;
 
     return (
         <Modal
@@ -59,17 +95,17 @@ export default function OrderModal({ order, visible, onClose }) {
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     <View style={styles.statusContainer}>
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-                            <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(statusLabel) }]}>
+                            <Text style={styles.statusText}>{statusLabel.toUpperCase()}</Text>
                         </View>
                     </View>
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Customer Information</Text>
-                        <Text style={styles.customerName}>{order.customerName}</Text>
-                        <TouchableOpacity style={styles.phoneContainer} onPress={() => Linking.openURL(`tel:${order.phoneNumber}`)}>
+                        <Text style={styles.customerName}>{user?.name || 'Customer'}</Text>
+                        <TouchableOpacity style={styles.phoneContainer} onPress={() => phoneNumber && Linking.openURL(`tel:${phoneNumber}`)}>
                             <Phone size={16} color="#2D7A7A" />
-                            <Text style={styles.phoneText}>{order.phoneNumber}</Text>
+                            <Text style={styles.phoneText}>{phoneNumber || "Not provided"}</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -77,7 +113,7 @@ export default function OrderModal({ order, visible, onClose }) {
                         <Text style={styles.sectionTitle}>Bottle In Hand</Text>
                         <View style={[styles.bottlesContainer, { backgroundColor: '#fff3a8ff' }]}>
                             <Droplets size={16} color="#2D7A7A" />
-                            <Text style={styles.bottlesText}>0 Bottles</Text>
+                            <Text style={styles.bottlesText}>{bottleInHand} Bottle{bottleInHand === 1 ? '' : 's'}</Text>
                         </View>
                     </View>
 
@@ -86,11 +122,11 @@ export default function OrderModal({ order, visible, onClose }) {
                         <View style={styles.addressContainer}>
                             <MapPin size={16} color="#6B7280" />
                             <View style={styles.addressDetails}>
-                                <Text style={styles.building}>{order.building}</Text>
-                                <Text style={styles.addressText}>Block: {order.floor}</Text>
-                                <Text style={styles.addressText}>Floor: {order.floor}</Text>
-                                <Text style={styles.addressText}>Room: {order.room}</Text>
-                                <Text style={styles.zoneText}>Camp: {order.zone}</Text>
+                                <Text style={styles.building}>{building}</Text>
+                                <Text style={styles.addressText}>Block: {block}</Text>
+                                <Text style={styles.addressText}>Floor: {floor}</Text>
+                                <Text style={styles.addressText}>Room: {room}</Text>
+                                <Text style={styles.zoneText}>Camp: {campLabel}</Text>
                             </View>
                         </View>
                     </View>
@@ -99,12 +135,17 @@ export default function OrderModal({ order, visible, onClose }) {
                         <Text style={styles.sectionTitle}>Order Details</Text>
                         <View style={styles.orderInfo}>
                             <View style={styles.packageContainer}>
-                                <Text style={styles.packageName}>{order.packageName}</Text>
+                                <Text style={styles.packageName}>{packageName}</Text>
                                 <View style={styles.bottlesContainer}>
                                     <Droplets size={16} color="#2D7A7A" />
-                                    <Text style={styles.bottlesText}>{order.bottles} Bottles</Text>
+                                    <Text style={styles.bottlesText}>{bottleCount} Bottle{bottleCount === 1 ? '' : 's'}</Text>
                                 </View>
                             </View>
+                            {order?.isConsumption && (
+                                <Text style={styles.consumptionMeta}>
+                                    Initial: {initialCount} | Left: {leftCount}
+                                </Text>
+                            )}
                         </View>
                     </View>
 
@@ -114,14 +155,14 @@ export default function OrderModal({ order, visible, onClose }) {
                             <Clock size={16} color="#6B7280" />
                             <View style={styles.timelineDetails}>
                                 <Text style={styles.timelineText}>
-                                    Ordered: {formatDate(order.orderDate)} at {formatTime(order.orderDate)}
+                                    Ordered: {formatDate(orderedDate)} at {formatTime(orderedDate)}
                                 </Text>
                                 <Text style={styles.timelineText}>
-                                    Assigned: {formatDate(order.orderDate)} at {formatTime(order.orderDate)}
+                                    Assigned: {formatDate(assignedDate)} at {formatTime(assignedDate)}
                                 </Text>
-                                {order.deliveryTime && (
+                                {deliveredDate && (
                                     <Text style={styles.timelineText}>
-                                        Delivered: {formatDate(order.deliveryTime)} at {formatTime(order.deliveryTime)}
+                                        Delivered: {formatDate(deliveredDate)} at {formatTime(deliveredDate)}
                                     </Text>
                                 )}
                             </View>
@@ -142,6 +183,7 @@ export default function OrderModal({ order, visible, onClose }) {
                             />
                             <Text style={styles.emptyBottlesLabel}>bottles</Text>
                         </View>
+                        <Text style={styles.captionText}>Collected so far: {emptyBottlesReceived}</Text>
                     </View>
 
                     <View style={styles.section}>
@@ -165,7 +207,7 @@ export default function OrderModal({ order, visible, onClose }) {
 
                 </ScrollView>
 
-                {order.status === 'pending' && (
+                {statusLabel === 'pending' && (
                     <View style={styles.actionButtons}>
                         <TouchableOpacity
                             style={[styles.actionButton, styles.completeButton]}
@@ -305,6 +347,12 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#aadde5ff',
     },
+    consumptionMeta: {
+        marginTop: 12,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#2D7A7A',
+    },
     packageContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -408,6 +456,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#2D7A7A',
         fontWeight: '500',
+    },
+    captionText: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#6B7280',
     },
     emptyBottlesDisplay: {
         flexDirection: 'row',

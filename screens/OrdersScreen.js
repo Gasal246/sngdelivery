@@ -14,118 +14,6 @@ yesterday.setDate(yesterday.getDate() - 1);
 const lastWeek = new Date(today);
 lastWeek.setDate(lastWeek.getDate() - 7);
 
-const mockOrders = [
-  {
-    id: '1',
-    customerName: 'Ahmad Al-Farsi',
-    building: 'Tower A',
-    floor: '02',
-    room: '210',
-    bottles: 5,
-    packageName: 'Demo Package Name',
-    zone: 'dubai-abc-1',
-    status: 'pending',
-    orderDate: today,
-    phoneNumber: '+971501234567',
-    notes: 'Please call before delivery'
-  },
-  {
-    id: '2',
-    customerName: 'Fatima Hassan',
-    building: 'Building B',
-    floor: '05',
-    room: '503',
-    bottles: 3,
-    packageName: 'Family Package',
-    zone: 'dubai-abc-1',
-    status: 'pending',
-    orderDate: today,
-    phoneNumber: '+971507654321'
-  },
-  {
-    id: '3',
-    customerName: 'Mohammed Ali',
-    building: 'Villa 123',
-    floor: 'Ground',
-    room: 'Main',
-    bottles: 8,
-    packageName: 'Bulk Package',
-    zone: 'dubai-abc-2',
-    status: 'completed',
-    orderDate: today,
-    deliveryTime: new Date(today.getTime() - 2 * 60 * 60 * 1000),
-    phoneNumber: '+971509876543'
-  },
-  {
-    id: '4',
-    customerName: 'Sarah Ahmed',
-    building: 'Tower C',
-    floor: '12',
-    room: '1205',
-    bottles: 2,
-    packageName: 'Standard Package',
-    zone: 'dubai-abc-2',
-    status: 'completed',
-    orderDate: today,
-    deliveryTime: new Date(today.getTime() - 4 * 60 * 60 * 1000),
-    phoneNumber: '+971502345678'
-  },
-  {
-    id: '5',
-    customerName: 'Omar Khalil',
-    building: 'Building D',
-    floor: '03',
-    room: '301',
-    bottles: 6,
-    packageName: 'Premium Package',
-    zone: 'dubai-def-1',
-    status: 'pending',
-    orderDate: today,
-    phoneNumber: '+971508765432'
-  },
-  {
-    id: '6',
-    customerName: 'Layla Ibrahim',
-    building: 'Tower E',
-    floor: '08',
-    room: '804',
-    bottles: 4,
-    packageName: 'Family Package',
-    zone: 'dubai-def-1',
-    status: 'completed',
-    orderDate: yesterday,
-    deliveryTime: yesterday,
-    phoneNumber: '+971503456789'
-  },
-  {
-    id: '7',
-    customerName: 'Hassan Mahmoud',
-    building: 'Villa 456',
-    floor: 'Ground',
-    room: 'Kitchen',
-    bottles: 10,
-    packageName: 'Bulk Package',
-    zone: 'sharjah-xyz-1',
-    status: 'pending',
-    orderDate: today,
-    phoneNumber: '+971506789012'
-  },
-  {
-    id: '8',
-    customerName: 'Amina Rashid',
-    building: 'Building F',
-    floor: '06',
-    room: '602',
-    bottles: 3,
-    packageName: 'Standard Package',
-    zone: 'sharjah-xyz-1',
-    status: 'completed',
-    orderDate: lastWeek,
-    deliveryTime: lastWeek,
-    phoneNumber: '+971504567890'
-  }
-];
-
 const OrdersScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -145,7 +33,8 @@ const OrdersScreen = () => {
     }
   }, [orders, userToken, dispatch]);
 
-  const normalizeStatus = (status) => {
+  const normalizeStatus = (status, isCancelled = false) => {
+    if (isCancelled) return "cancelled";
     if (status === 0 || status === "0") return "pending";
     if (status === 1 || status === "1") return "completed";
     if (status === 2 || status === "2") return "cancelled";
@@ -168,37 +57,6 @@ const OrdersScreen = () => {
       return matchesStore && matchesCamp;
     });
   }, [sourceOrders, storeId, campId]);
-
-  const displayOrders = filteredOrders.map((order, index) => {
-    const orderId = order?._id || order?.order_id || order?.id || `order-${index}`;
-    const customerName = order?.customer_name || order?.customerName || order?.user_name || "Customer";
-    const building = order?.building || order?.address || order?.block || "Building";
-    const floor = order?.floor || order?.level || "0";
-    const room = order?.room || order?.unit || order?.apartment || "0";
-    const bottleCount = order?.bottle_count ?? order?.bottles ?? 0;
-    const packageName = order?.package_name || order?.packageName || "Package";
-    const orderDate = parseDate(order?.orderDate || order?.createdAt || order?.created_at);
-    const deliveryTime = order?.deliveryTime ? parseDate(order.deliveryTime) : order?.deliveredAt ? parseDate(order.deliveredAt) : undefined;
-
-    return {
-      id: `${orderId}`,
-      customerName,
-      building,
-      floor: `${floor}`,
-      room: `${room}`,
-      bottles: bottleCount,
-      packageName,
-      zone: order?.zone || campName || storeName || "Zone",
-      status: normalizeStatus(order?.status),
-      orderDate,
-      deliveryTime,
-      phoneNumber: order?.phone || order?.phoneNumber || order?.customer_phone || "",
-      notes: order?.notes,
-      store_id: order?.store_id ?? order?.storeId,
-      camp_id: order?.camp_id ?? order?.campId,
-      raw: order,
-    };
-  });
 
   const selectedLabel = useMemo(() => {
     if (storeName || campName) {
@@ -260,7 +118,7 @@ const OrdersScreen = () => {
         </View>
         <TouchableOpacity style={styles.header2} onPress={() => navigation.navigate("StaffCamps")}>
           <Text style={{ fontFamily: "Orbitron", fontSize: 17, textAlign: "left", fontWeight: "bold", opacity: 0.9 }}>
-            ({displayOrders.length}) {selectedLabel}
+            ({filteredOrders.length}) {selectedLabel}
           </Text>
           <ChevronRight size={24} strokeWidth={3} color="#000" />
         </TouchableOpacity>
@@ -275,9 +133,9 @@ const OrdersScreen = () => {
         {showFilters && renderFilters()}
 
         <FlatList
-          data={displayOrders}
+          data={filteredOrders}
           style={{ height: "78%", borderRadius: 10, overflow: 'hidden' }}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item?._id}
           renderItem={({ item }) => (
             <OrderCard
               order={item}

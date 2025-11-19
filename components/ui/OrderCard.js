@@ -3,56 +3,70 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Droplets, MapPin, Clock } from 'lucide-react-native';
 
 export default function OrderCard({ order, onPress }) {
+  const ensureDate = (value) => {
+    if (value instanceof Date) return value;
+    const parsed = value ? new Date(value) : new Date();
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
   const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    const safeDate = ensureDate(date);
+    return safeDate.toLocaleTimeString('en-US', {
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { 
+    const safeDate = ensureDate(date);
+    return safeDate.toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
     });
   };
 
+  const orderDate = ensureDate(order?.createdAt);
+  const deliveryTime = order?.deliveryTime ? ensureDate(order.deliveryTime) : null;
+  const bottles = order?.order?.bottle_count ?? 0;
+  const buildingLabel = order?.order?.user?.building_no || 'nil';
+  const blockLabel = order?.order?.user?.block ? ` | Block ${order.order.user.block}` : '';
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} testID={`order-card-${order.id}`}>
+    <TouchableOpacity style={styles.card} onPress={onPress} testID={`order-card-${order._id}`}>
       <View style={styles.header}>
         <View style={styles.packageBadge}>
-          <Text style={styles.packageText}>{order.packageName}</Text>
+          <Text style={styles.packageText}>{order?.order?.package_name || "Package"}</Text>
         </View>
         <View style={styles.bottlesBadge}>
           <Droplets size={14} color="#2D7A7A" />
-          <Text style={styles.bottlesText}>{order.bottles.toString().padStart(2, '0')} Bottles</Text>
+          <Text style={styles.bottlesText}>{bottles.toString().padStart(2, '0')} Bottle{bottles === 1 ? '' : 's'}</Text>
         </View>
       </View>
 
-      <Text style={styles.customerName}>{order.customerName}</Text>
+      <Text style={styles.customerName}>{order?.order?.user?.name || "Customer"}</Text>
       
       <View style={styles.addressContainer}>
         <MapPin size={14} color="#e8f1f1ff" />
         <View style={styles.addressText}>
-          <Text style={styles.building}>Building: {order.building}</Text>
-          <Text style={styles.details}>Floor: {order.floor}</Text>
-          <Text style={styles.details}>Room: {order.room}</Text>
+          <Text style={styles.building}>Building: {buildingLabel}{blockLabel}</Text>
+          <Text style={styles.details}>Floor: {order?.order?.user?.floor_no ?? "-"}</Text>
+          <Text style={styles.details}>Room: {order?.order?.user?.room_no ?? "-"}</Text>
         </View>
       </View>
 
       <View style={styles.timeContainer}>
         <Clock size={14} color="#e0e1e4ff" />
         <Text style={styles.timeText}>
-          {formatDate(order.orderDate)}, {formatTime(order.orderDate)}
+          {formatDate(orderDate)}, {formatTime(orderDate)}
         </Text>
       </View>
 
-      {order.status === 'completed' && order.deliveryTime && (
+      {order?.status === 'completed' && deliveryTime && (
         <View style={styles.completedBadge}>
           <Text style={styles.completedText}>
-            Delivered at {formatTime(order.deliveryTime)}
+            Delivered at {formatTime(deliveryTime)}
           </Text>
         </View>
       )}
