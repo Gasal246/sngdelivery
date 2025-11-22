@@ -1,17 +1,34 @@
-import React, { useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Linking, } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Linking, Alert, ActivityIndicator } from 'react-native';
 import { X, Phone, MapPin, Droplets, Clock, CheckCircle, XCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import axios from 'axios';
+import { baseUrl } from '../../constants/endpoints';
 
 export default function OrderModal({ order, visible, onClose }) {
     const [isUpdating, setIsUpdating] = useState(false);
-    const [emptyBottleCount, setEmptyBottleCount] = useState(0);
+    const [emptyBottleCount, setEmptyBottleCount] = useState('0');
     const [notes, setNotes] = useState("");
     const [inputHeight, setInputHeight] = useState(80);
+    const [deliveredCount, setDeliveredCount] = useState(1);
+    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+
+    useEffect(() => {
+        setEmptyBottleCount('0');
+        setNotes('');
+        setInputHeight(80);
+        setIsUpdating(false);
+        setShowCompleteDialog(false);
+        setDeliveredCount(maxDeliverableCount);
+    }, [orderId, maxDeliverableCount]);
+
+    const { userToken } = useSelector((state) => state.application);
 
     if (!order) return null;
 
+    const orderId = order?._id;
     const ensureDate = (value) => {
         if (value instanceof Date) return value;
         const parsed = value ? new Date(value) : new Date();
@@ -70,6 +87,45 @@ export default function OrderModal({ order, visible, onClose }) {
         ? ensureDate(order?.updatedAt || nestedOrder?.updatedAt)
         : null;
     const bottleInHand = nestedOrder?.bottle_in_hand ?? 0;
+    const maxDeliverableCount = bottleCount > 0 ? bottleCount : 1;
+    const deliveredBottles = order?.delivered_bottles ?? 0;
+
+    const handleCompleteOrder = async () => {
+        if (!orderId || !userToken) {
+            Alert.alert("Unable to update", "Missing order reference or user session.");
+            return;
+        }
+
+        const finalDeliveredCount = Math.min(
+            maxDeliverableCount,
+            Math.max(1, deliveredCount || 1)
+        );
+
+        setIsUpdating(true);
+        try {
+            await axios.post(`${baseUrl}/delivery-staff/complete-order`, {
+                orderId,
+                status: "delivered",
+                note: notes?.trim() || '',
+                empty_bottles: Number(emptyBottleCount) || 0,
+                delivered_bottles: finalDeliveredCount,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${userToken}`
+                }
+            });
+
+            Alert.alert("Order completed", "Delivery marked as completed successfully.");
+            setShowCompleteDialog(false);
+            onClose?.();
+        } catch (error) {
+            const message = error?.response?.data?.message || "Failed to mark order as completed.";
+            Alert.alert("Error", message);
+            console.log("Complete order failed", error?.response ?? error);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     return (
         <Modal
@@ -163,19 +219,19 @@ export default function OrderModal({ order, visible, onClose }) {
                             </View>
                         </View>
 
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Empty Bottles to Return</Text>
-                            <Text style={styles.sectionSubtitle}>Enter the number of empty bottles to collect</Text>
-                            <View style={styles.emptyBottlesInputContainer}>
-                                <TextInput
-                                    style={styles.emptyBottlesInput}
-                                    value={emptyBottleCount}
-                                    onChangeText={(value) => setEmptyBottleCount(value)}
-                                    keyboardType="numeric"
-                                    placeholder="0"
-                                    placeholderTextColor="#9CA3AF"
-                                />
-                                <Text style={styles.emptyBottlesLabel}>bottles</Text>
+        <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Empty Bottles to Return</Text>
+            <Text style={styles.sectionSubtitle}>Enter the number of empty bottles to collect</Text>
+            <View style={styles.emptyBottlesInputContainer}>
+                <TextInput
+                    style={styles.emptyBottlesInput}
+                    value={emptyBottleCount}
+                    onChangeText={(value) => setEmptyBottleCount(value.replace(/[^0-9]/g, ''))}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="#9CA3AF"
+                />
+                <Text style={styles.emptyBottlesLabel}>bottles</Text>
                             </View>
                         </View>
 
@@ -201,7 +257,10 @@ export default function OrderModal({ order, visible, onClose }) {
                         <View style={styles.actionButtons}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.completeButton]}
-                                onPress={() => { }}
+                                onPress={() => {
+                                    setDeliveredCount(maxDeliverableCount);
+                                    setShowCompleteDialog(true);
+                                }}
                                 disabled={isUpdating}
                             >
                                 <CheckCircle size={20} color="white" />
@@ -220,6 +279,59 @@ export default function OrderModal({ order, visible, onClose }) {
                     )}
                 </SafeAreaView>
             </LinearGradient>
+
+            <Modal
+                visible={showCompleteDialog}
+                animationType="fade"
+                transparent
+                onRequestClose={() => !isUpdating && setShowCompleteDialog(false)}
+            >
+                <View style={styles.dialogOverlay}>
+                    <View style={styles.dialogCard}>
+                        <View style={styles.dialogHeader}>
+                            <Text style={styles.dialogTitle}>Confirm Delivery</Text>
+                            <TouchableOpacity onPress={() => !isUpdating && setShowCompleteDialog(false)}>
+                                <X size={18} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.dialogSubtitle}>
+                            Adjust delivered bottles if needed. Max {maxDeliverableCount} bottles.
+                        </Text>
+
+                        <View style={styles.counterRow}>
+                            <TouchableOpacity
+                                style={[styles.counterButton, deliveredCount <= 1 && styles.counterButtonDisabled]}
+                                onPress={() => setDeliveredCount((prev) => Math.max(1, prev - 1))}
+                                disabled={deliveredCount <= 1 || isUpdating}
+                            >
+                                <Text style={styles.counterButtonText}>-</Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.counterValue}>{deliveredCount}</Text>
+
+                            <TouchableOpacity
+                                style={[styles.counterButton, (deliveredCount >= maxDeliverableCount) && styles.counterButtonDisabled]}
+                                onPress={() => setDeliveredCount((prev) => Math.min(maxDeliverableCount, prev + 1))}
+                                disabled={deliveredCount >= maxDeliverableCount || isUpdating}
+                            >
+                                <Text style={styles.counterButtonText}>+</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.dialogConfirmButton, isUpdating && { opacity: 0.8 }]}
+                            onPress={handleCompleteOrder}
+                            disabled={isUpdating}
+                        >
+                            {isUpdating ? (
+                                <ActivityIndicator color="#ffffff" />
+                            ) : (
+                                <Text style={styles.dialogConfirmText}>Confirm Delivery</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </Modal>
     );
 }
@@ -465,5 +577,81 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#2D7A7A',
+    },
+    dialogOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    dialogCard: {
+        width: '100%',
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 20,
+        gap: 16,
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 20,
+        elevation: 8,
+    },
+    dialogHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dialogTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    dialogSubtitle: {
+        fontSize: 14,
+        color: '#4B5563',
+        lineHeight: 20,
+    },
+    counterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    counterButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        backgroundColor: '#10B981',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    counterButtonDisabled: {
+        backgroundColor: '#D1D5DB',
+    },
+    counterButtonText: {
+        color: '#ffffff',
+        fontSize: 22,
+        fontWeight: '700',
+    },
+    counterValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    dialogConfirmButton: {
+        backgroundColor: '#10B981',
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    dialogConfirmText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '700',
     }
 });

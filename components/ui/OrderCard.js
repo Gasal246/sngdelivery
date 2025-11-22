@@ -32,6 +32,7 @@ export default function OrderCard({ order, onPress }) {
   const bottles = order?.order?.bottle_count ?? 0;
   const buildingLabel = order?.order?.user?.building_no || 'nil';
   const blockLabel = order?.order?.user?.block ? ` | Block ${order.order.user.block}` : '';
+  const deliverdCount = order?.delivered_bottles ?? 0;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} testID={`order-card-${order._id}`}>
@@ -41,7 +42,7 @@ export default function OrderCard({ order, onPress }) {
         </View>
         <View style={styles.bottlesBadge}>
           <Droplets size={14} color="#2D7A7A" />
-          <Text style={styles.bottlesText}>{bottles.toString().padStart(2, '0')} Bottle{bottles === 1 ? '' : 's'}</Text>
+          <Text style={styles.bottlesText}>{(bottles - deliverdCount).toString().padStart(2, '0')} Bottle{(bottles - deliverdCount) === 1 ? '' : 's'}</Text>
         </View>
       </View>
 
