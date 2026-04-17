@@ -46,6 +46,7 @@ const CheckNumberPage = () => {
         const token = await AsyncStorage.getItem("token");
         const userData = await AsyncStorage.getItem("user_data");
         if (token && userData) {
+            console.log('User Found: "'+(await JSON.parse(userData))?.name+'"')
             dispatch(loadUserToken(token));
             dispatch(loadUserData(await JSON.parse(userData)));
             navigation.navigate("Home");

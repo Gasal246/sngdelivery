@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Linking, Alert, ActivityIndicator } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Linking, Alert, ActivityIndicator, ToastAndroid } from 'react-native';
 import { X, Phone, MapPin, Droplets, Clock, CheckCircle, XCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { baseUrl } from '../../constants/endpoints';
+import CustomAlert from './CustomAlert';
 
 export default function OrderModal({ order, visible, onClose }) {
     const [isUpdating, setIsUpdating] = useState(false);
@@ -14,6 +15,7 @@ export default function OrderModal({ order, visible, onClose }) {
     const [inputHeight, setInputHeight] = useState(80);
     const [deliveredCount, setDeliveredCount] = useState(1);
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
 
     useEffect(() => {
         setEmptyBottleCount('0');
@@ -66,8 +68,8 @@ export default function OrderModal({ order, visible, onClose }) {
     const user = nestedOrder?.user ?? {};
     const packageName = nestedOrder?.package_name || nestedOrder?.packge_name || 'Package';
     const bottleCount = nestedOrder?.bottle_count ?? 0;
-    const leftCount = nestedOrder?.left_count ?? bottleCount;
-    const initialCount = nestedOrder?.initial_count ?? bottleCount;
+    const leftCount = nestedOrder?.left_count ?? 0;
+    const initialCount = nestedOrder?.initial_count ?? 0;
     const phoneNumber = user?.phone ? `+${user?.country_code ?? ''}${user.phone}` : '';
     const building = user?.building_no || user?.block_building || 'N/A';
     const block = user?.block || user?.block_building || 'N/A';
@@ -87,8 +89,8 @@ export default function OrderModal({ order, visible, onClose }) {
         ? ensureDate(order?.updatedAt || nestedOrder?.updatedAt)
         : null;
     const bottleInHand = nestedOrder?.bottle_in_hand ?? 0;
-    const maxDeliverableCount = bottleCount > 0 ? bottleCount : 1;
     const deliveredBottles = order?.delivered_bottles ?? 0;
+    const maxDeliverableCount = bottleCount-deliveredBottles > 0 ? bottleCount-deliveredBottles : 1;
 
     const handleCompleteOrder = async () => {
         if (!orderId || !userToken) {
@@ -125,6 +127,40 @@ export default function OrderModal({ order, visible, onClose }) {
         } finally {
             setIsUpdating(false);
         }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!orderId || !userToken) {
+            Alert.alert("Unable to update", "Missing order reference or user session.");
+            return;
+        }
+
+        setIsUpdating(true);
+        try {
+            await axios.post(`${baseUrl}/delivery-staff/complete-order`, {
+                orderId,
+                status: "delivered",
+                note: notes?.trim() || '',
+                empty_bottles: Number(emptyBottleCount) || 0,
+                delivered_bottles: 0,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${userToken}`
+                }
+            });
+
+            ToastAndroid.show("Order cancelled successfully", ToastAndroid.SHORT);
+            setShowCancelDialog(false);
+            onClose?.();
+        } catch (error) {
+            const message = error?.response?.data?.message || "Failed to mark order as completed.";
+            Alert.alert("Error", message);
+            console.log("Complete order failed", error?.response ?? error);
+        } finally {
+            setIsUpdating(false);
+        }
+        setShowCancelDialog(false);
+        onClose?.();
     };
 
     return (
@@ -188,7 +224,7 @@ export default function OrderModal({ order, visible, onClose }) {
                                     <Text style={styles.packageName}>{packageName}</Text>
                                     <View style={styles.bottlesContainer}>
                                         <Droplets size={16} color="#2D7A7A" />
-                                        <Text style={styles.bottlesText}>{bottleCount} Bottle{bottleCount === 1 ? '' : 's'}</Text>
+                                        <Text style={styles.bottlesText}>{bottleCount-deliveredBottles} Bottle{(bottleCount-deliveredBottles) === 1 ? '' : 's'}</Text>
                                     </View>
                                 </View>
                                 {order?.isConsumption && (
@@ -269,7 +305,7 @@ export default function OrderModal({ order, visible, onClose }) {
 
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.cancelButton]}
-                                onPress={() => { }}
+                                onPress={() => setShowCancelDialog(true)}
                                 disabled={isUpdating}
                             >
                                 <XCircle size={20} color="white" />
@@ -332,6 +368,26 @@ export default function OrderModal({ order, visible, onClose }) {
                     </View>
                 </View>
             </Modal>
+
+            <CustomAlert
+                visible={showCancelDialog}
+                title="Cancelling Order"
+                description="Are you sure Cancelling the order, make sure you have written notes."
+                icon={<XCircle size={18} color="#EF4444" />}
+                onRequestClose={() => setShowCancelDialog(false)}
+                actions={[
+                    {
+                        text: 'Go Back',
+                        variant: 'secondary',
+                        onPress: () => setShowCancelDialog(false),
+                    },
+                    {
+                        text: 'Cancel Order',
+                        variant: 'destructive',
+                        onPress: handleCancelOrder,
+                    },
+                ]}
+            />
         </Modal>
     );
 }

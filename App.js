@@ -119,7 +119,7 @@ export default function App() {
     <Provider store={store}>
       <NavigationContainer>
         <StatusBar style="light" />
-        <Stack.Navigator initialRouteName='CheckNumber'>
+        <Stack.Navigator initialRouteName='Home'>
           <Stack.Screen name="CheckNumber" component={CheckNumberPage} options={{ headerShown: false }} />
           <Stack.Screen name="LoginPage" component={LoginPage} options={{ headerShown: false }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
